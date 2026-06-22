@@ -1,4 +1,4 @@
-# PGAI Athena Voice Bot — Test System
+# Voice-Bot
 
 An automated voice bot that calls the Athena AI agent, simulates realistic patient scenarios, records and transcribes every conversation, and generates a bug report from the findings.
 
