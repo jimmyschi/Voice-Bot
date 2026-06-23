@@ -1,0 +1,28 @@
+CALL TRANSCRIPT
+============================================================
+Call ID  : CAa1da0eb47194790749c0e89702a2a0ba
+Date     : 2026-06-23T13:07:16.322602Z
+Scenario : Simple Appointment Scheduling
+Patient  : John Smith
+============================================================
+
+[00:00] AGENT    This call may be recorded for quality and training purposes.
+[00:01] PATIENT  Oh, um, okay that's fine with me. Yeah, I'm calling to try and schedule my annual physical exam—do you have any openings sometime next week?
+[00:20] AGENT    I just need to confirm your date of birth. Could you please provide your date of birth?
+[00:21] PATIENT  Sure, it's March 15th, 1978. Is that all you need, or...?
+[00:41] AGENT    That's all I need for now.
+[00:43] PATIENT  Great, um, so do you have any times available next week for the physical?
+[00:49] AGENT    Do you have a preferred provider for your annual physical exam?
+[00:51] PATIENT  Um, I'm not sure what you mean by that. Do you mean like, a specific doctor? I don't really have a preference—whoever's available works for me. Can you just find me an opening next week?
+[01:12] AGENT    Let me check for any provider's availability for your
+[01:15] PATIENT  Yeah, take your time. I'm just looking for whenever works, like I said—anytime next week is fine with me.
+[01:22] AGENT    annual physical exam next week. One moment.
+[01:23] PATIENT  Okay, sounds good. I'll wait.
+[01:33] AGENT    I found several openings for your annual physical exam next week.
+[01:34] PATIENT  Oh great! Um, what times do you have available? And which days, if you don't mind?
+[01:41] AGENT    On Monday, June 29, you can see
+[01:43] PATIENT  Wait, um, I'm sorry—did you say June? I thought we were looking at next week. Today's March 15th, right? That's like three months away. Do you have anything sooner, like next week in March?
+[01:56] AGENT    On Monday, June 20
+[02:00] PATIENT  Um, I'm confused. June 20th is still way too far out. I need something next week—like the week of March 20th or so. Do you have any openings then instead?
+[02:16] AGENT    today is actually June today is June 23.
+[02:17] PATIENT  Oh! Oh okay, um, I apologize for the confusion. So today is June 23rd? Alright, so next week would be like June 29th and beyond then, right? So yeah, Monday June 29th could work for me. What time slots do you have available that day?

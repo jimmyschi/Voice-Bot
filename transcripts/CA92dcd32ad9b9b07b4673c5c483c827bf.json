@@ -1,0 +1,89 @@
+{
+  "call_sid": "CA92dcd32ad9b9b07b4673c5c483c827bf",
+  "scenario_id": "simple_scheduling",
+  "scenario_name": "Simple Appointment Scheduling",
+  "patient_name": "John Smith",
+  "recorded_at": "2026-06-23T12:55:46.417088Z",
+  "turns": [
+    {
+      "speaker": "agent",
+      "text": "This call may be recorded for quality and training purposes.",
+      "timestamp": 1782219257.230998
+    },
+    {
+      "speaker": "patient",
+      "text": "Oh, okay, um, that's fine with me. Thanks for letting me know. I'm calling to see if I can schedule my annual physical exam sometime next week if you have any openings?",
+      "timestamp": 1782219259.151048
+    },
+    {
+      "speaker": "agent",
+      "text": "For calling Pivot.",
+      "timestamp": 1782219273.5910761
+    },
+    {
+      "speaker": "patient",
+      "text": "Oh, right, thank you. Yes, I'm calling Pivot to schedule my physical. Is this the right number?",
+      "timestamp": 1782219274.502348
+    },
+    {
+      "speaker": "agent",
+      "text": "Can you please provide your date of birth?",
+      "timestamp": 1782219284.103907
+    },
+    {
+      "speaker": "patient",
+      "text": "Sure, um, my date of birth is March 15th, 1978. Does that help?",
+      "timestamp": 1782219285.039139
+    },
+    {
+      "speaker": "agent",
+      "text": "Yes. You've reached Pivot Point Orthopedics. To help",
+      "timestamp": 1782219292.422713
+    },
+    {
+      "speaker": "patient",
+      "text": "Oh, wait — orthopedics? Um, I think I may have called the wrong number. I'm looking to schedule a routine physical exam, not an orthopedics appointment. Is this not a general medical office?",
+      "timestamp": 1782219293.521996
+    },
+    {
+      "speaker": "agent",
+      "text": "yes.",
+      "timestamp": 1782219306.4230158
+    },
+    {
+      "speaker": "patient",
+      "text": "Oh okay, so this is a general medical office then? Great! So, um, can we go ahead and schedule that annual physical for me sometime next week?",
+      "timestamp": 1782219309.290632
+    },
+    {
+      "speaker": "agent",
+      "text": "This is Pivot Point Orthopedics.",
+      "timestamp": 1782219319.094943
+    },
+    {
+      "speaker": "patient",
+      "text": "Oh, I see — so this is orthopedics, not a general practice. I think I called the wrong place. Do you happen to have the number for a general medical office, or should I just hang up and look for the right one?",
+      "timestamp": 1782219320.502929
+    },
+    {
+      "speaker": "agent",
+      "text": "Just to clarify,",
+      "timestamp": 1782219334.119213
+    },
+    {
+      "speaker": "patient",
+      "text": "Yeah, sorry, go ahead — I'm listening.",
+      "timestamp": 1782219334.926489
+    },
+    {
+      "speaker": "agent",
+      "text": "No worries at all. If you need anything related to orthopedics,",
+      "timestamp": 1782219344.451551
+    },
+    {
+      "speaker": "patient",
+      "text": "Right, but I don't need orthopedics — I just need a regular physical exam. So I think I've got the wrong number. Thanks anyway, and sorry for the confusion!\n\n Thank you, bye.",
+      "timestamp": 1782219346.025523
+    }
+  ]
+}

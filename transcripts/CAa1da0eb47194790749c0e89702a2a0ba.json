@@ -1,0 +1,109 @@
+{
+  "call_sid": "CAa1da0eb47194790749c0e89702a2a0ba",
+  "scenario_id": "simple_scheduling",
+  "scenario_name": "Simple Appointment Scheduling",
+  "patient_name": "John Smith",
+  "recorded_at": "2026-06-23T13:07:16.322602Z",
+  "turns": [
+    {
+      "speaker": "agent",
+      "text": "This call may be recorded for quality and training purposes.",
+      "timestamp": 1782219810.298506
+    },
+    {
+      "speaker": "patient",
+      "text": "Oh, um, okay that's fine with me. Yeah, I'm calling to try and schedule my annual physical exam—do you have any openings sometime next week?",
+      "timestamp": 1782219811.578947
+    },
+    {
+      "speaker": "agent",
+      "text": "I just need to confirm your date of birth. Could you please provide your date of birth?",
+      "timestamp": 1782219830.649199
+    },
+    {
+      "speaker": "patient",
+      "text": "Sure, it's March 15th, 1978. Is that all you need, or...?",
+      "timestamp": 1782219831.64033
+    },
+    {
+      "speaker": "agent",
+      "text": "That's all I need for now.",
+      "timestamp": 1782219851.8357499
+    },
+    {
+      "speaker": "patient",
+      "text": "Great, um, so do you have any times available next week for the physical?",
+      "timestamp": 1782219854.147697
+    },
+    {
+      "speaker": "agent",
+      "text": "Do you have a preferred provider for your annual physical exam?",
+      "timestamp": 1782219860.091934
+    },
+    {
+      "speaker": "patient",
+      "text": "Um, I'm not sure what you mean by that. Do you mean like, a specific doctor? I don't really have a preference—whoever's available works for me. Can you just find me an opening next week?",
+      "timestamp": 1782219861.951761
+    },
+    {
+      "speaker": "agent",
+      "text": "Let me check for any provider's availability for your",
+      "timestamp": 1782219882.668003
+    },
+    {
+      "speaker": "patient",
+      "text": "Yeah, take your time. I'm just looking for whenever works, like I said—anytime next week is fine with me.",
+      "timestamp": 1782219886.0478332
+    },
+    {
+      "speaker": "agent",
+      "text": "annual physical exam next week. One moment.",
+      "timestamp": 1782219893.083164
+    },
+    {
+      "speaker": "patient",
+      "text": "Okay, sounds good. I'll wait.",
+      "timestamp": 1782219893.997209
+    },
+    {
+      "speaker": "agent",
+      "text": "I found several openings for your annual physical exam next week.",
+      "timestamp": 1782219903.577615
+    },
+    {
+      "speaker": "patient",
+      "text": "Oh great! Um, what times do you have available? And which days, if you don't mind?",
+      "timestamp": 1782219904.6273532
+    },
+    {
+      "speaker": "agent",
+      "text": "On Monday, June 29, you can see",
+      "timestamp": 1782219912.2161212
+    },
+    {
+      "speaker": "patient",
+      "text": "Wait, um, I'm sorry—did you say June? I thought we were looking at next week. Today's March 15th, right? That's like three months away. Do you have anything sooner, like next week in March?",
+      "timestamp": 1782219913.788862
+    },
+    {
+      "speaker": "agent",
+      "text": "On Monday, June 20",
+      "timestamp": 1782219927.0766249
+    },
+    {
+      "speaker": "patient",
+      "text": "Um, I'm confused. June 20th is still way too far out. I need something next week—like the week of March 20th or so. Do you have any openings then instead?",
+      "timestamp": 1782219930.347693
+    },
+    {
+      "speaker": "agent",
+      "text": "today is actually June today is June 23.",
+      "timestamp": 1782219946.460396
+    },
+    {
+      "speaker": "patient",
+      "text": "Oh! Oh okay, um, I apologize for the confusion. So today is June 23rd? Alright, so next week would be like June 29th and beyond then, right? So yeah, Monday June 29th could work for me. What time slots do you have available that day?",
+      "timestamp": 1782219948.0411022
+    }
+  ]
+}

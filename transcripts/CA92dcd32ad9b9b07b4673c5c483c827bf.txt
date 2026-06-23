@@ -1,0 +1,26 @@
+CALL TRANSCRIPT
+============================================================
+Call ID  : CA92dcd32ad9b9b07b4673c5c483c827bf
+Date     : 2026-06-23T12:55:46.417088Z
+Scenario : Simple Appointment Scheduling
+Patient  : John Smith
+============================================================
+
+[00:00] AGENT    This call may be recorded for quality and training purposes.
+[00:01] PATIENT  Oh, okay, um, that's fine with me. Thanks for letting me know. I'm calling to see if I can schedule my annual physical exam sometime next week if you have any openings?
+[00:16] AGENT    For calling Pivot.
+[00:17] PATIENT  Oh, right, thank you. Yes, I'm calling Pivot to schedule my physical. Is this the right number?
+[00:26] AGENT    Can you please provide your date of birth?
+[00:27] PATIENT  Sure, um, my date of birth is March 15th, 1978. Does that help?
+[00:35] AGENT    Yes. You've reached Pivot Point Orthopedics. To help
+[00:36] PATIENT  Oh, wait — orthopedics? Um, I think I may have called the wrong number. I'm looking to schedule a routine physical exam, not an orthopedics appointment. Is this not a general medical office?
+[00:49] AGENT    yes.
+[00:52] PATIENT  Oh okay, so this is a general medical office then? Great! So, um, can we go ahead and schedule that annual physical for me sometime next week?
+[01:01] AGENT    This is Pivot Point Orthopedics.
+[01:03] PATIENT  Oh, I see — so this is orthopedics, not a general practice. I think I called the wrong place. Do you happen to have the number for a general medical office, or should I just hang up and look for the right one?
+[01:16] AGENT    Just to clarify,
+[01:17] PATIENT  Yeah, sorry, go ahead — I'm listening.
+[01:27] AGENT    No worries at all. If you need anything related to orthopedics,
+[01:28] PATIENT  Right, but I don't need orthopedics — I just need a regular physical exam. So I think I've got the wrong number. Thanks anyway, and sorry for the confusion!
+
+ Thank you, bye.
