@@ -122,6 +122,48 @@ class CallManager:
 
         logger.info(f"Recording saved to {dest_path}")
 
+    def fetch_recording_for_call(self, call_sid: str, dest_path: str, poll_timeout: int = 90) -> bool:
+        """
+        Poll Twilio's REST API until a completed recording exists for this call,
+        then download it as an MP3.
+
+        Twilio typically takes 15–60 seconds after a call ends to encode a
+        recording.  We poll every 5 seconds up to `poll_timeout` seconds total.
+        Returns True if the recording was saved, False if the timeout was reached.
+
+        This approach avoids relying on the /recording-status webhook callback,
+        which can arrive after the main process has exited.
+        """
+        import time
+        import requests
+
+        account_sid = os.environ["TWILIO_ACCOUNT_SID"]
+        auth_token = os.environ["TWILIO_AUTH_TOKEN"]
+        deadline = time.time() + poll_timeout
+
+        while time.time() < deadline:
+            try:
+                recordings = self._client.recordings.list(call_sid=call_sid, limit=1)
+                for rec in recordings:
+                    if rec.status == "completed":
+                        mp3_url = (
+                            f"https://api.twilio.com/2010-04-01/Accounts/"
+                            f"{account_sid}/Recordings/{rec.sid}.mp3"
+                        )
+                        resp = requests.get(mp3_url, auth=(account_sid, auth_token), timeout=60)
+                        resp.raise_for_status()
+                        os.makedirs(os.path.dirname(dest_path) or ".", exist_ok=True)
+                        with open(dest_path, "wb") as fh:
+                            fh.write(resp.content)
+                        logger.info(f"Recording saved to {dest_path}")
+                        return True
+            except Exception as exc:
+                logger.warning(f"Recording poll error for {call_sid}: {exc}")
+            time.sleep(5)
+
+        logger.warning(f"Recording not ready within {poll_timeout}s for call {call_sid}")
+        return False
+
     def is_active(self, call_sid: str) -> bool:
         return call_sid in self._active_calls
 

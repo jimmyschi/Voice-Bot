@@ -75,6 +75,10 @@ active_sessions: dict[str, dict] = {}
 # look up the right scenario when Twilio POSTs to it.
 pending_scenarios: dict[str, str] = {}
 
+# Tracks which call SIDs have already had terminate_call() issued so we don't
+# fire the REST request repeatedly on every incoming audio chunk.
+_termination_sent: set[str] = set()
+
 
 def set_call_manager(cm: CallManager) -> None:
     global _call_manager
@@ -237,8 +241,17 @@ async def media_stream_handler(websocket: WebSocket) -> None:
                     audio = base64.b64decode(msg["media"]["payload"])
                     await pipeline.process_audio(audio)
 
-                    # Check for hang-up signal without consuming the queue
-                    if agent and agent.should_end_call and _call_manager and call_sid:
+                    # Terminate the call once when the agent signals end-of-call.
+                    # Guard with a per-call flag so we only issue one REST request
+                    # instead of one per audio chunk (which arrives ~50 times/sec).
+                    if (
+                        agent
+                        and agent.should_end_call
+                        and _call_manager
+                        and call_sid
+                        and call_sid not in _termination_sent
+                    ):
+                        _termination_sent.add(call_sid)
                         _call_manager.terminate_call(call_sid)
 
             elif event == "stop":

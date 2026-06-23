@@ -8,59 +8,73 @@ How it fits into the system
 Twilio opens a WebSocket to our server and streams µ-law audio (8 kHz, 8-bit) in
 20 ms chunks as it captures audio from the remote party (the Athena AI agent).
 This module accepts those raw audio bytes, forwards them to Deepgram's streaming
-speech-to-text API, waits for complete utterances, hands the transcribed text to
-the PatientAgent LLM to generate a realistic patient reply, converts that reply
-back to µ-law audio via Deepgram's TTS API, and streams the audio chunks back to
-Twilio so they play on the call in real time.
+speech-to-text WebSocket, waits for complete utterances, hands the transcribed
+text to the PatientAgent LLM to generate a realistic patient reply, converts that
+reply back to µ-law audio via Deepgram's TTS REST API, and streams the audio
+chunks back to Twilio so they play on the call in real time.
+
+Why we talk to Deepgram directly instead of using their SDK
+------------------------------------------------------------
+Deepgram SDK v7 (the version pip resolves to by default) is an auto-generated
+client from their OpenAPI spec and no longer exposes the streaming WebSocket
+interface.  Rather than pin to an older SDK version, we connect to Deepgram's
+WebSocket API directly using the `websockets` library.  The protocol is simple:
+send raw audio bytes, receive JSON transcript messages.  This makes the code
+independent of SDK releases and easy to understand.
 
 Turn-taking approach
 --------------------
-Healthcare AI agents are always the first to speak (greeting the caller), so we
-begin in a listening state.  Deepgram signals end-of-utterance via endpointing —
-after 600 ms of silence it emits a final transcript.  We treat each final
-transcript as one complete agent turn and queue it for processing.  While we are
-sending TTS audio back to Twilio we pause forwarding inbound audio to Deepgram so
-our own voice is not accidentally transcribed as the agent's speech.
+Healthcare AI agents always speak first (greeting the caller), so we begin in a
+listening state.  Deepgram's endpointing emits a final transcript after 600 ms
+of silence — we treat each one as a complete agent turn.  While we are sending
+TTS audio back to Twilio we pause forwarding inbound audio to Deepgram so our
+own synthesised voice is not transcribed as the agent's speech.
 
 Concurrency model
 -----------------
 `start()` spawns a background asyncio Task (_process_responses) that drains a
-queue fed by Deepgram's transcript callbacks.  This decouples the high-frequency
-audio-forwarding path (called ~50 times per second) from the slower LLM + TTS
-path (typically 1–3 seconds per turn).  Both paths are async so the FastAPI event
-loop is never blocked.
+queue fed by the Deepgram listener Task (_listen_deepgram).  The high-frequency
+audio-forwarding path (called ~50 times/second) never awaits anything slow; it
+just drops bytes into the Deepgram WebSocket send buffer.
 
 Audio format notes
 ------------------
 Twilio Media Streams use µ-law (G.711) at 8 kHz, mono, with each WebSocket
 message containing a base64-encoded chunk of 160 bytes (20 ms of audio).
-Deepgram's STT API can consume µ-law directly at 8 kHz, which means we send the
-bytes as-is without re-encoding.  Deepgram's TTS API is asked to produce µ-law
-at 8 kHz with no container so the response body is raw µ-law bytes that can be
-chunked and sent straight back to Twilio.
+Deepgram's streaming API accepts µ-law at 8 kHz directly, so we forward bytes
+as-is.  The TTS REST endpoint is asked to produce µ-law at 8 kHz with no
+container header, giving us raw µ-law bytes that chunk straight back to Twilio.
 """
 
 import asyncio
 import base64
+import json
 import logging
 import os
 from typing import Optional
 
 import httpx
-from deepgram import (
-    DeepgramClient,
-    DeepgramClientOptions,
-    LiveTranscriptionEvents,
-    LiveOptions,
-)
+import websockets
 from fastapi import WebSocket
 
 from bot.patient_agent import PatientAgent
 
 logger = logging.getLogger(__name__)
 
-CHUNK_SIZE = 160          # 160 bytes = 20 ms of µ-law 8 kHz audio; must match Twilio's chunk size
-INTER_CHUNK_DELAY = 0.02  # 20 ms delay between sent chunks keeps playback at real-time speed
+DEEPGRAM_STT_URL = (
+    "wss://api.deepgram.com/v1/listen"
+    "?encoding=mulaw"
+    "&sample_rate=8000"
+    "&model=nova-2"
+    "&language=en-US"
+    "&smart_format=true"
+    "&endpointing=600"
+    "&interim_results=false"
+)
+DEEPGRAM_TTS_URL = "https://api.deepgram.com/v1/speak"
+
+CHUNK_SIZE = 160          # 160 bytes = 20 ms of µ-law 8 kHz audio
+INTER_CHUNK_DELAY = 0.02  # 20 ms delay keeps playback at real-time speed
 
 
 class AudioPipeline:
@@ -71,115 +85,105 @@ class AudioPipeline:
     ----------
     websocket       The FastAPI WebSocket connected to Twilio's media stream.
     stream_sid      Twilio stream identifier — required in every outbound message.
-    agent           The PatientAgent instance that owns the conversation state for
-                    this call (conversation history, transcript, end-call flag).
-    _dg_connection  Live Deepgram WebSocket connection for streaming STT.
-    _response_queue asyncio.Queue that the Deepgram callback pushes final
+    agent           The PatientAgent instance owning conversation state for this
+                    call (history, transcript, end-call flag).
+    _dg_ws          The raw `websockets` connection to Deepgram's streaming STT.
+    _response_queue asyncio.Queue that the Deepgram listener pushes final
                     transcript strings into and _process_responses drains.
-    _bot_speaking   True while TTS audio is being sent to Twilio.  Used to pause
-                    forwarding inbound audio to Deepgram so we don't accidentally
-                    transcribe our own voice as the agent's speech.
+    _bot_speaking   True while TTS audio is being sent to Twilio.  Pauses inbound
+                    audio forwarding so we don't transcribe our own voice.
     """
 
     def __init__(self, websocket: WebSocket, stream_sid: str, agent: PatientAgent) -> None:
         self.websocket = websocket
         self.stream_sid = stream_sid
         self.agent = agent
-        self._dg_connection = None
+        self._dg_ws = None
         self._response_queue: asyncio.Queue = asyncio.Queue()
+        self._listener_task: Optional[asyncio.Task] = None
         self._processor_task: Optional[asyncio.Task] = None
         self._bot_speaking = False
 
     async def start(self) -> None:
-        """Open the Deepgram streaming connection and launch the response processor."""
-        self._dg_connection = await self._init_deepgram()
+        """Open the Deepgram WebSocket and launch the listener and response-processor tasks."""
+        api_key = os.environ["DEEPGRAM_API_KEY"]
+        self._dg_ws = await websockets.connect(
+            DEEPGRAM_STT_URL,
+            additional_headers={"Authorization": f"Token {api_key}"},
+        )
+        self._listener_task = asyncio.create_task(self._listen_deepgram())
         self._processor_task = asyncio.create_task(self._process_responses())
 
     async def stop(self) -> None:
-        """Gracefully shut down the processor task and close the Deepgram connection."""
-        if self._processor_task:
-            self._processor_task.cancel()
+        """Gracefully cancel background tasks and close the Deepgram WebSocket."""
+        for task in (self._listener_task, self._processor_task):
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+        if self._dg_ws:
             try:
-                await self._processor_task
-            except asyncio.CancelledError:
-                pass
-        if self._dg_connection:
-            try:
-                await self._dg_connection.finish()
+                await self._dg_ws.close()
             except Exception:
                 pass
 
     async def process_audio(self, audio_data: bytes) -> None:
         """
-        Forward one µ-law audio chunk from Twilio to the Deepgram streaming API.
+        Forward one µ-law audio chunk from Twilio to Deepgram.
 
-        We skip forwarding when the bot is currently speaking to avoid feeding our
-        own TTS output into the transcription pipeline.  Twilio only sends the
-        remote party's audio on the inbound track, but there can be acoustic
-        bleed-through if the far end doesn't mute properly.
+        Skips forwarding while the bot is speaking to prevent our TTS audio
+        from being transcribed back as the agent's speech.
         """
-        if self._dg_connection and not self._bot_speaking:
+        if self._dg_ws and not self._bot_speaking:
             try:
-                await self._dg_connection.send(audio_data)
+                await self._dg_ws.send(audio_data)
             except Exception as exc:
-                logger.warning(f"Deepgram send error: {exc}")
+                logger.warning(f"Deepgram audio send error: {exc}")
 
-    async def _init_deepgram(self):
+    async def _listen_deepgram(self) -> None:
         """
-        Open an authenticated Deepgram WebSocket and register the transcript callback.
+        Continuously read JSON messages from Deepgram and enqueue final transcripts.
 
-        We configure the connection for µ-law at 8 kHz to match Twilio's format
-        exactly — no transcoding needed.  `endpointing=600` tells Deepgram to emit
-        a final transcript after 600 ms of silence, which gives the agent enough
-        time to finish a sentence before we respond.  `interim_results=False`
-        suppresses partial transcripts so our queue only receives stable final
-        utterances.
+        Deepgram emits transcript messages with type "Results".  We only act on
+        messages where `is_final=True` and the transcript string is non-empty —
+        these represent a complete, stable utterance after the 600 ms silence
+        endpointing window has closed.
         """
-        api_key = os.environ["DEEPGRAM_API_KEY"]
-        config = DeepgramClientOptions(options={"keepalive": "true"})
-        client = DeepgramClient(api_key, config)
-        conn = client.listen.asyncwebsocket.v("1")
+        try:
+            async for raw in self._dg_ws:
+                try:
+                    msg = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
 
-        async def _on_transcript(_, result, **__):
-            # Deepgram fires this callback for every transcript event; we only act
-            # on final results that contain non-empty text.
-            try:
-                transcript = result.channel.alternatives[0].transcript
-                if result.is_final and transcript.strip():
+                if msg.get("type") != "Results":
+                    continue
+
+                is_final = msg.get("is_final", False)
+                try:
+                    transcript = msg["channel"]["alternatives"][0]["transcript"]
+                except (KeyError, IndexError):
+                    continue
+
+                if is_final and transcript.strip():
                     await self._response_queue.put(transcript)
-            except Exception as exc:
-                logger.warning(f"Transcript handler error: {exc}")
 
-        conn.on(LiveTranscriptionEvents.Transcript, _on_transcript)
-
-        options = LiveOptions(
-            model="nova-2",
-            language="en-US",
-            smart_format=True,
-            encoding="mulaw",
-            channels=1,
-            sample_rate=8000,
-            endpointing=600,
-            interim_results=False,
-        )
-
-        started = await conn.start(options)
-        if not started:
-            raise RuntimeError("Failed to start Deepgram connection")
-
-        return conn
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            logger.error(f"Deepgram listener error: {exc}")
 
     async def _process_responses(self) -> None:
         """
         Drain the transcript queue one utterance at a time.
 
-        Each item in the queue is a string containing what the Athena agent said.
-        We pass it to the PatientAgent to generate a reply, then speak that reply
-        aloud.  If the agent signals that the conversation goal has been met (or
-        the max-turn limit is hit) we hang up.
-
-        Running this in a dedicated task means audio forwarding is never delayed
-        by LLM or TTS latency — they operate on separate coroutine "threads".
+        Each item is the agent's complete spoken turn.  We pass it to
+        PatientAgent to generate a reply, speak that reply aloud, then check
+        whether the agent has signalled end-of-call.  Running this in a
+        dedicated task means audio forwarding is never delayed by LLM or TTS
+        latency — they operate on separate coroutine "threads".
         """
         while True:
             try:
@@ -196,7 +200,7 @@ class AudioPipeline:
                 await self._speak(patient_text)
 
             if self.agent.should_end_call:
-                logger.info("Patient agent signaled end of call — hanging up.")
+                logger.info("Patient agent signalled end of call — hanging up.")
                 await self._request_hang_up()
                 break
 
@@ -205,15 +209,13 @@ class AudioPipeline:
         Convert text to raw µ-law audio using Deepgram's Aura TTS REST API.
 
         We request `encoding=mulaw`, `sample_rate=8000`, and `container=none`
-        so the response body is a bare byte stream of µ-law samples — exactly
-        the format Twilio's media stream expects, with no WAV/OGG header overhead
-        to strip.  This lets us pipe the response bytes directly into _speak()
-        without any audio conversion step.
+        so the response body is bare µ-law samples — no WAV/OGG header to strip.
+        This lets us pipe the bytes directly into _speak() without any conversion.
         """
         api_key = os.environ["DEEPGRAM_API_KEY"]
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
-                "https://api.deepgram.com/v1/speak",
+                DEEPGRAM_TTS_URL,
                 params={
                     "model": "aura-asteria-en",
                     "encoding": "mulaw",
@@ -231,12 +233,12 @@ class AudioPipeline:
 
     async def _speak(self, text: str) -> None:
         """
-        Synthesize speech for the given text and stream the audio back to Twilio.
+        Synthesise speech for the given text and stream the audio back to Twilio.
 
         Audio is sent in 160-byte chunks with a 20 ms sleep between each chunk.
         This pacing mirrors Twilio's own inbound audio rate and prevents buffer
-        overruns on the Twilio side.  The _bot_speaking flag is raised for the
-        entire duration so that the audio forwarding path pauses during playback.
+        overruns.  The _bot_speaking flag is raised for the entire duration so
+        the audio-forwarding path pauses during playback.
         """
         try:
             audio = await self._tts(text)
@@ -263,14 +265,12 @@ class AudioPipeline:
         """
         Signal the outer server layer to terminate the Twilio call via REST.
 
-        We can't issue a Twilio REST API call from inside the pipeline directly
-        (it doesn't hold a reference to the Twilio client), so we push a sentinel
-        onto the queue.  The server's media-stream handler watches for this
-        sentinel and issues the REST termination request.
+        We push a sentinel onto the queue.  The server's media-stream handler
+        watches for agent.should_end_call after each audio event and issues
+        the REST termination request itself.
         """
         await self._response_queue.put(_HANG_UP_SENTINEL)
 
 
-# Sentinel used to propagate a hang-up request from _process_responses back to
-# the WebSocket handler in server.py without raising an exception.
+# Sentinel used to propagate a hang-up request back to the WebSocket handler.
 _HANG_UP_SENTINEL = object()

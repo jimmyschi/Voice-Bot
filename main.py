@@ -113,10 +113,19 @@ def run_scenario(call_manager: CallManager, scenario_id: str) -> str:
 
 
 def wait_for_call(call_manager: CallManager, call_sid: str, timeout: int = 300) -> None:
-    """Block until the call completes or the timeout (seconds) is reached."""
+    """
+    Block until the call completes, then poll Twilio for the recording.
+
+    After the call ends we immediately start polling Twilio's REST API for a
+    completed recording (up to 90 seconds).  This replaces reliance on the
+    /recording-status webhook, which arrives asynchronously and can be missed
+    if the process exits before Twilio delivers it.
+    """
     deadline = time.time() + timeout
     while time.time() < deadline:
         if not call_manager.is_active(call_sid):
+            dest = os.path.join("recordings", f"{call_sid}.mp3")
+            call_manager.fetch_recording_for_call(call_sid, dest)
             return
         time.sleep(2)
     logger.warning(f"Timed out waiting for call {call_sid} — forcing completion.")
@@ -198,7 +207,8 @@ async def main() -> None:
         logger.info(f"Single run: {scenario.name}")
         call_sid = run_scenario(call_manager, args.scenario)
         wait_for_call(call_manager, call_sid)
-        logger.info("Call complete.")
+        logger.info("Call complete. Running bug analysis ...")
+        await run_analysis()
 
 
 if __name__ == "__main__":
